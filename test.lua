@@ -57,7 +57,12 @@ testResult = test("test wrongfully throwing", function(expect)
 end)
 printTestResult(testResult)
 assert_equals(testResult.status, 'failed')
-assert_equals(testResult.failed[1], '/cc-ut/test.lua:56: test error')
+
+local function extractErrorMessage(errorString)
+  return errorString:match("^.+:%d+:%s*(.+)$")
+end
+
+assert_equals(extractErrorMessage(testResult.failed[1]), 'test error')
 
 testResult = describe('successful describe', function(test)
   test("matching 1", function(expect)
