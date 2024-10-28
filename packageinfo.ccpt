@@ -1,0 +1,13 @@
+{
+    name = "ComputerCraft Unit Testing",
+    id = "cc-ut",
+    comment = "Unit testing library for ComputerCraft/CC: Tweaked",
+    author = "Luiz Martins",
+    website = "https://github.com/luiz00martins/cc-ut",
+    newestversion = "0.0.1",
+    dependencies = {},
+    install = {
+        type = "script",
+        scripturl = "https://raw.githubusercontent.com/luiz00martins/cc-ut/main/ccpt-install.lua"
+    }
+}
