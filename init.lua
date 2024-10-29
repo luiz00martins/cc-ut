@@ -1,8 +1,35 @@
+---@alias ExpectFunction fun(value: any): Expectation
+---@alias TestFunction fun(expect: ExpectFunction)
+---@alias TestBlock fun(test: fun(testName: string, func: TestFunction))
+
+---@class Expectation
+---@field toBe fun(expected: any): Expectation
+---@field toEqual fun(expected: any): Expectation
+---@field toThrow fun(): Expectation
+---@field toContain fun(expected: any): Expectation
+---@field toBeTruthy fun(): Expectation
+
+---@class UtInstance
+---@field test fun(testName: string, func: TestFunction): TestResult
+---@field describe fun(description: string, block: TestBlock): DescribeResult
+
+---@class TestResult
+---@field name string
+---@field status "passed"|"failed"
+---@field failed? string[]
+---@field passed? string[]
+
+---@class DescribeResult
+---@field name string
+---@field status "passed"|"failed"
+---@field failed TestResult[]
+---@field passed TestResult[]
+
 local utils = require('/cc-ut/utils')
 
 local table_compare_by_value = utils.table_compare_by_value
 
-local function instance(config)
+local function create_instance(config)
   config = config or {}
   local verbose = config.verbose ~= false  -- Default to true if not specified
 
@@ -228,10 +255,13 @@ local function instance(config)
     }
   end
 
-  return {
+  ---@type UtInstance
+  local instance = {
     test = test,
     describe = describe
   }
+
+  return instance
 end
 
-return instance
+return create_instance
