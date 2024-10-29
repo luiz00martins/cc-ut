@@ -1,4 +1,4 @@
-local Ut = require("cc-ut")
+local Ut = require("/cc-ut")
 
 local previousColor = term.getTextColor()
 term.setTextColor(colors.green)

@@ -1,4 +1,4 @@
-local utils = require('cc-ut.utils')
+local utils = require('/cc-ut/utils')
 
 local table_compare_by_value = utils.table_compare_by_value
 

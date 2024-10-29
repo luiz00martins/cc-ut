@@ -1,4 +1,4 @@
-local ut = require("cc-ut")
+local ut = require("/cc-ut")
 
 local test = ut.test
 local describe = ut.describe

@@ -35,15 +35,15 @@ local args = {...}
 
 local base_url = "https://raw.githubusercontent.com/luiz00martins/cc-ut/main/"
 local files = {
-    ["init.lua"] = "cc-ut/init.lua",
-    ["utils.lua"] = "cc-ut/utils.lua",
-    ["test.lua"] = "cc-ut/test.lua",
-    ["example.lua"] = "cc-ut/example.lua"
+    ["init.lua"] = "/cc-ut/init.lua",
+    ["utils.lua"] = "/cc-ut/utils.lua",
+    ["test.lua"] = "/cc-ut/test.lua",
+    ["example.lua"] = "/cc-ut/example.lua"
 }
 
 if args[1] == "install" or args[1] == nil then
     print("Installing cc-ut...")
-    fs.makeDir("cc-ut")
+    fs.makeDir("/cc-ut")
 
     for file, path in pairs(files) do
         print("Downloading " .. file .. "...")
@@ -65,7 +65,7 @@ elseif args[1] == "update" then
 
 elseif args[1] == "remove" then
     print("Removing cc-ut...")
-    fs.delete("cc-ut")
+    fs.delete("/cc-ut")
     print("cc-ut successfully removed!")
 
 else
