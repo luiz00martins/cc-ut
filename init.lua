@@ -35,6 +35,8 @@ local function create_instance(config)
 
   -- Utility to compare values and print results with colors
   local function printResult(testName, failed, indent)
+    local original_color = term.getTextColor()
+
     if not verbose then return end
     indent = indent or ""
     if #failed == 0 then
@@ -51,7 +53,8 @@ local function create_instance(config)
         end
       end
     end
-    term.setTextColor(colors.white)
+
+    term.setTextColor(original_color)
   end
 
   local function createExpectation(evaluated, passed, failed)
@@ -123,47 +126,57 @@ local function create_instance(config)
     return expectation
   end
 
-  local function test(testName, func)
-    if not func then
-      error('No function provided')
-    end
+  local function createTestFunction(onTest)
+    return function(testName, func)
+      if not func then
+        error('No function provided')
+      end
 
-    local expectation = createExpectation(false, nil, nil)
+      local expectation = createExpectation(false, nil, nil)
+      local success, err = pcall(func, expectation.expect)
 
-    local success, err = pcall(func, expectation.expect)
-
-    if not success then
-      printResult(testName, {err})
-      return {
-        name = testName,
-        status = 'failed',
-        failed = {err},
-      }
-    elseif not expectation.evaluated then
-      local error_message = 'No expectations set'
-      printResult(testName, {error_message})
-      return {
-        name = testName,
-        status = 'failed',
-        failed = {error_message},
-      }
-    else
-      printResult(testName, expectation.failed)
-
-      if #expectation.failed > 0 then
-        return {
+      local result
+      if not success then
+        result = {
           name = testName,
           status = 'failed',
-          failed = expectation.failed,
+          failed = {err},
+        }
+      elseif not expectation.evaluated then
+        local error_message = 'No expectations set'
+        result = {
+          name = testName,
+          status = 'failed',
+          failed = {error_message},
         }
       else
-        return {
-          name = testName,
-          status = 'passed',
-          passed = expectation.passed,
-        }
+        if #expectation.failed > 0 then
+          result = {
+            name = testName,
+            status = 'failed',
+            failed = expectation.failed,
+          }
+        else
+          result = {
+            name = testName,
+            status = 'passed',
+            passed = expectation.passed,
+          }
+        end
       end
+
+      if onTest then
+        onTest(testName, result)
+      end
+
+      return result
     end
+  end
+
+  local function test(testName, func)
+    return createTestFunction(function(testName, result)
+      printResult(testName, result.failed or {})
+    end)(testName, func)
   end
 
   local function describe(description, block)
@@ -171,57 +184,33 @@ local function create_instance(config)
       error('No block provided')
     end
 
+    local original_color = term.getTextColor()
     local tests = {}
     local failed = {}
     local passed = {}
 
-    local function localTest(testName, func)
-      table.insert(tests, {name = testName, func = func})
-    end
-
-    block(localTest)
-
     if verbose then
-      -- Initial output
-      print(description)
-      term.write('Running tests: [' .. string.rep(' ', 10) .. '] (0/' .. #tests .. ')')
+      term.setTextColor(colors.blue)
+      print('* ' .. description)
     end
 
-    for i, test in ipairs(tests) do
-      local expectation = createExpectation(false, nil, nil)
-      local success, err = pcall(test.func, expectation.expect)
-      if not success then
-        expectation.failed = {err}
-      elseif not expectation.evaluated then
-        expectation.failed = {'No expectations set'}
-        success = false
+    local localTest = createTestFunction(function(testName, result)
+      if result.status == 'failed' then
+        table.insert(failed, result)
       else
-        success = #expectation.failed == 0
+        table.insert(passed, result)
       end
-
-      if not success then
-        table.insert(failed, {
-          name = test.name,
-          failed = expectation.failed,
-        })
-      else
-        table.insert(passed, {
-          name = test.name,
-          passed = expectation.passed,
-        })
-      end
+      table.insert(tests, result)
 
       if verbose then
         -- Update progress bar
-        term.setCursorPos(1, select(2, term.getCursorPos()) - 1)
+        term.setCursorPos(1, select(2, term.getCursorPos()))
         term.clearLine()
-        term.write('. ' .. description)
-        term.setCursorPos(1, select(2, term.getCursorPos()) + 1)
-        term.clearLine()
-        local progress = math.floor((i / #tests) * 10)
-        term.write('Running tests: [' .. string.rep('#', progress) .. string.rep(' ', 10 - progress) .. '] (' .. i .. '/' .. #tests .. ')')
+        term.write('  * ' .. testName)
       end
-    end
+    end)
+
+    block(localTest)
 
     if verbose then
       -- Clear lines for final message
@@ -244,7 +233,7 @@ local function create_instance(config)
         end
       end
 
-      term.setTextColor(colors.white)
+      term.setTextColor(original_color)
     end
 
     return {
