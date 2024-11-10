@@ -86,6 +86,16 @@ local function printResult(args)
   term.setTextColor(original_color)
 end
 
+---@class ExpectationInternal
+---@field evaluated boolean
+---@field passed string[]
+---@field failed string[]
+---@field expect ExpectFunction
+
+---@param evaluated boolean
+---@param passed? string[]
+---@param failed? string[]
+---@return ExpectationInternal
 local function createExpectation(evaluated, passed, failed)
   local expectation = {
     evaluated = evaluated,
