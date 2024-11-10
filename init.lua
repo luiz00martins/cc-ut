@@ -52,8 +52,12 @@ local utils = require('/cc-ut/utils')
 local table_compare_by_value = utils.table_compare_by_value
 local array_concat = utils.array_concat
 
----Utility to compare values and print results with colors
----@param args {testName: string, failed?: string[], indent?: string, verbose?: boolean}
+---@class PrintResultArgs
+---@field testName string
+---@field failed? string[]
+---@field indent? string
+---@field verbose? boolean
+---@param args PrintResultArgs
 local function printResult(args)
   local testName = args.testName
   local failed = args.failed or {}
@@ -158,7 +162,11 @@ local function runHooks(hooks)
   end
 end
 
----@param args {onTest?: fun(testName: string, result: TestResult), ut_hooks?: InstanceHooks, test_hooks?: InstanceHooks}
+---@class CreateTestFunctionArgs
+---@field onTest? fun(testName: string, result: TestResult)
+---@field ut_hooks? InstanceHooks
+---@field test_hooks? InstanceHooks
+---@param args CreateTestFunctionArgs
 ---@return fun(testName: string, block: TestBlock): TestResult
 local function createTestFunction(args)
   local onTest = args.onTest
@@ -223,7 +231,13 @@ local function createTestFunction(args)
   end
 end
 
----@param config {verbose?: boolean, ut_hooks?: InstanceHooks, describe_hooks?: InstanceHooks, onDescribe?: fun(description: string, result: DescribeResult), onTest?: fun(testName: string, result: TestResult)}
+---@class CreateDescribeFunctionConfig
+---@field verbose? boolean
+---@field ut_hooks? InstanceHooks
+---@field describe_hooks? InstanceHooks
+---@field onDescribe? fun(description: string, result: DescribeResult)
+---@field onTest? fun(testName: string, result: TestResult)
+---@param config CreateDescribeFunctionConfig
 ---@return fun(description: string, block: DescribeBlock): DescribeResult
 local function createDescribeFunction(config)
   local verbose = config.verbose ~= false
@@ -308,7 +322,11 @@ local function createDescribeFunction(config)
   end
 end
 
----@param args {testName: string, indent?: string, verbose?: boolean}
+---@class PrintDescribeTestProgressArgs
+---@field testName string
+---@field indent? string
+---@field verbose? boolean
+---@param args PrintDescribeTestProgressArgs
 local function printDescribeTestProgress(args)
   local testName = args.testName
   local indent = args.indent or ""
@@ -322,7 +340,12 @@ local function printDescribeTestProgress(args)
   term.write(indent .. '* ' .. testName)
 end
 
----@param args {description: string, result: DescribeResult, verbose?: boolean, original_color: number}
+---@class PrintDescribeResultArgs
+---@field description string
+---@field result DescribeResult
+---@field verbose? boolean
+---@field original_color number
+---@param args PrintDescribeResultArgs
 local function printDescribeResult(args)
   local description = args.description
   local result = args.result
@@ -354,7 +377,9 @@ local function printDescribeResult(args)
   term.setTextColor(original_color)
 end
 
----@param config? {verbose?: boolean}
+---@class CreateInstanceConfig
+---@field verbose? boolean
+---@param config? CreateInstanceConfig
 ---@return UtInstance
 local function create_instance(config)
   config = config or {}
