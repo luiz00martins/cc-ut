@@ -3,6 +3,8 @@
 ---@alias DescribeBlock fun(test: fun(testName: string, func: TestBlock))
 ---@alias TestFunction fun(testName: string, block: TestBlock): TestResult
 ---@alias DescribeFunction fun(description: string, block: DescribeBlock): DescribeResult
+---@alias TestMetaCall fun(self: TestInstance, testName: string, block: TestBlock): TestResult
+---@alias DescribeMetaCall fun(self: DescribeInstance, description: string, block: DescribeBlock): DescribeResult
 
 ---@class Expectation
 ---@field toBe fun(expected: any): Expectation
@@ -11,9 +13,15 @@
 ---@field toContain fun(expected: any): Expectation
 ---@field toBeTruthy fun(): Expectation
 
+---@class TestInstance
+---@overload fun(testName: string, block: TestBlock): TestResult
+
+---@class DescribeInstance
+---@overload fun(description: string, block: DescribeBlock): DescribeResult
+
 ---@class UtInstance
----@field test TestFunction
----@field describe DescribeFunction
+---@field test TestInstance
+---@field describe DescribeInstance
 
 ---@class TestResult
 ---@field name string
@@ -180,22 +188,11 @@ local function createTestFunction(onTest)
 end
 
 ---@param config {verbose?: boolean}
----@return UtInstance
-local function create_instance(config)
-  config = config or {}
+---@return fun(description: string, block: DescribeBlock): DescribeResult
+local function createDescribeFunction(config)
   local verbose = config.verbose ~= false -- Default to true if not specified
 
-  ---@type TestFunction
-  local function test(testName, block)
-    local testFunction = createTestFunction(function(_testName, result)
-      printResult{testName = _testName, failed = result.failed, verbose = verbose}
-    end)
-
-    return testFunction(testName, block)
-  end
-
-  ---@type DescribeFunction
-  local function describe(description, block)
+  return function(description, block)
     if not block then
       error('No block provided')
     end
@@ -259,6 +256,40 @@ local function create_instance(config)
       passed = passed,
     }
   end
+end
+
+---@param config? {verbose?: boolean}
+---@return UtInstance
+local function create_instance(config)
+  config = config or {}
+  local verbose = config.verbose ~= false -- Default to true if not specified
+
+  local test = {}
+  ---@type TestInstance
+  test = setmetatable(test, {
+    ---@type TestMetaCall
+    __call = function(_, testName, block)
+      local testFn = createTestFunction(function(_testName, result)
+        printResult{
+          testName = _testName,
+          failed = result.failed,
+          verbose = verbose
+        }
+      end)
+
+      return testFn(testName, block)
+    end
+  })
+
+  local describe = {}
+  ---@type DescribeInstance
+  describe = setmetatable(describe, {
+    ---@type DescribeMetaCall
+    __call = function(_, description, block)
+      local describeFn = createDescribeFunction(config)
+      return describeFn(description, block)
+    end
+  })
 
   ---@type UtInstance
   local instance = {
