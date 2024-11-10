@@ -308,6 +308,52 @@ local function createDescribeFunction(config)
   end
 end
 
+---@param args {testName: string, indent?: string, verbose?: boolean}
+local function printDescribeTestProgress(args)
+  local testName = args.testName
+  local indent = args.indent or ""
+  local verbose = args.verbose ~= false
+
+  if not verbose then return end
+
+  -- Update progress bar
+  term.setCursorPos(1, select(2, term.getCursorPos()))
+  term.clearLine()
+  term.write(indent .. '* ' .. testName)
+end
+
+---@param args {description: string, result: DescribeResult, verbose?: boolean, original_color: number}
+local function printDescribeResult(args)
+  local description = args.description
+  local result = args.result
+  local verbose = args.verbose ~= false
+  local original_color = args.original_color
+
+  if not verbose then return end
+
+  -- Clear lines for final message
+  term.setCursorPos(1, select(2, term.getCursorPos()) - 1)
+  term.clearLine()
+  term.setCursorPos(1, select(2, term.getCursorPos()) + 1)
+  term.clearLine()
+  term.setCursorPos(1, select(2, term.getCursorPos()) - 1)
+
+  -- Final message
+  if #result.failed == 0 then
+    term.setTextColor(colors.green)
+    print('+ ' .. description .. ' (' .. #result.passed .. '/' .. (#result.failed + #result.passed) .. ')')
+  else
+    term.clearLine()
+    term.setTextColor(colors.red)
+    print('- ' .. description .. ' (' .. #result.failed + #result.passed .. '/' .. (#result.failed + #result.passed) .. ')')
+    for _, test_result in ipairs(result.failed) do
+      printResult{testName = test_result.name, failed = test_result.failed, verbose = verbose}
+    end
+  end
+
+  term.setTextColor(original_color)
+end
+
 ---@param config? {verbose?: boolean}
 ---@return UtInstance
 local function create_instance(config)
@@ -370,37 +416,15 @@ local function create_instance(config)
         ut_hooks = hooks,
         describe_hooks = describe_hooks,
         onTest = function(testName)
-          if verbose then
-            -- Update progress bar
-            term.setCursorPos(1, select(2, term.getCursorPos()))
-            term.clearLine()
-            term.write('  * ' .. testName)
-          end
+          printDescribeTestProgress{testName = testName, indent = "  ", verbose = verbose}
         end,
         onDescribe = function(description, result)
-          if verbose then
-            -- Clear lines for final message
-            term.setCursorPos(1, select(2, term.getCursorPos()) - 1)
-            term.clearLine()
-            term.setCursorPos(1, select(2, term.getCursorPos()) + 1)
-            term.clearLine()
-            term.setCursorPos(1, select(2, term.getCursorPos()) - 1)
-
-            -- Final message
-            if #result.failed == 0 then
-              term.setTextColor(colors.green)
-              print('+ ' .. description .. ' (' .. #result.passed .. '/' .. (#result.failed + #result.passed) .. ')')
-            else
-              term.clearLine()
-              term.setTextColor(colors.red)
-              print('- ' .. description .. ' (' .. #result.passed .. '/' .. (#result.failed + #result.passed) .. ')')
-              for _, test_result in ipairs(result.failed) do
-                printResult{testName = test_result.name, failed = test_result.failed, verbose = verbose}
-              end
-            end
-
-            term.setTextColor(original_color)
-          end
+          printDescribeResult{
+            description = description,
+            result = result,
+            verbose = verbose,
+            original_color = original_color
+          }
         end
       }
 
