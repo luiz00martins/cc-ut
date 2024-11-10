@@ -1,6 +1,6 @@
 ---@alias ExpectFunction fun(value: any): Expectation
 ---@alias TestBlock fun(expect: ExpectFunction)
----@alias DescribeBlock fun(test: fun(testName: string, func: TestBlock))
+---@alias DescribeBlock fun(test: TestInstance)
 ---@alias TestFunction fun(testName: string, block: TestBlock): TestResult
 ---@alias DescribeFunction fun(description: string, block: DescribeBlock): DescribeResult
 ---@alias TestMetaCall fun(self: TestInstance, testName: string, block: TestBlock): TestResult
@@ -14,14 +14,20 @@
 ---@field toBeTruthy fun(): Expectation
 
 ---@class TestInstance
+---@field beforeEach fun(hook: function)
+---@field afterEach fun(hook: function)
 ---@overload fun(testName: string, block: TestBlock): TestResult
 
 ---@class DescribeInstance
+---@field beforeEach fun(hook: function)
+---@field afterEach fun(hook: function)
 ---@overload fun(description: string, block: DescribeBlock): DescribeResult
 
 ---@class UtInstance
 ---@field test TestInstance
 ---@field describe DescribeInstance
+---@field beforeEach fun(hook: function)
+---@field afterEach fun(hook: function)
 
 ---@class TestResult
 ---@field name string
@@ -35,9 +41,16 @@
 ---@field failed TestResult[]
 ---@field passed TestResult[]
 
+---@alias Hook fun()
+
+---@class InstanceHooks
+---@field before Hook[]
+---@field after Hook[]
+
 local utils = require('/cc-ut/utils')
 
 local table_compare_by_value = utils.table_compare_by_value
+local array_concat = utils.array_concat
 
 ---Utility to compare values and print results with colors
 ---@param args {testName: string, failed?: string[], indent?: string, verbose?: boolean}
@@ -138,16 +151,39 @@ local function createExpectation(evaluated, passed, failed)
   return expectation
 end
 
----@param onTest fun(testName: string, result: TestResult)
+---@param hooks Hook[]
+local function runHooks(hooks)
+  for _, hook in ipairs(hooks) do
+    hook()
+  end
+end
+
+---@param args {onTest?: fun(testName: string, result: TestResult), ut_hooks?: InstanceHooks, test_hooks?: InstanceHooks}
 ---@return fun(testName: string, block: TestBlock): TestResult
-local function createTestFunction(onTest)
+local function createTestFunction(args)
+  local onTest = args.onTest
+  local ut_hooks = args.ut_hooks or {
+    before = {},
+    after = {},
+  }
+  local test_hooks = args.test_hooks or {
+    before = {},
+    after = {},
+  }
+
   return function(testName, block)
     if not block then
       error('No function provided')
     end
 
+    runHooks(ut_hooks.before)
+    runHooks(test_hooks.before)
+
     local expectation = createExpectation(false, nil, nil)
     local success, err = pcall(block, expectation.expect)
+
+    runHooks(test_hooks.after)
+    runHooks(ut_hooks.after)
 
     local result
     if not success then
@@ -187,10 +223,18 @@ local function createTestFunction(onTest)
   end
 end
 
----@param config {verbose?: boolean}
+---@param config {verbose?: boolean, ut_hooks?: InstanceHooks, describe_hooks?: InstanceHooks}
 ---@return fun(description: string, block: DescribeBlock): DescribeResult
 local function createDescribeFunction(config)
-  local verbose = config.verbose ~= false -- Default to true if not specified
+  local verbose = config.verbose ~= false
+  local hooks = config.describe_hooks or {
+    before = {},
+    after = {},
+  }
+  local ut_hooks = config.ut_hooks or {
+    before = {},
+    after = {},
+  }
 
   return function(description, block)
     if not block then
@@ -207,23 +251,57 @@ local function createDescribeFunction(config)
       print('* ' .. description)
     end
 
-    local localTest = createTestFunction(function(testName, result)
-      if result.status == 'failed' then
-        table.insert(failed, result)
-      else
-        table.insert(passed, result)
-      end
-      table.insert(tests, result)
+    local local_test_hooks = {
+      before = {},
+      after = {}
+    }
 
-      if verbose then
-        -- Update progress bar
-        term.setCursorPos(1, select(2, term.getCursorPos()))
-        term.clearLine()
-        term.write('  * ' .. testName)
+    local localTest = {}
+    ---@type TestInstance
+    localTest = setmetatable(localTest, {
+      ---@type TestMetaCall
+      __call = function(_, testName, block)
+        local testFn = createTestFunction{
+          onTest = function(_testName, result)
+            if result.status == 'failed' then
+              table.insert(failed, result)
+            else
+              table.insert(passed, result)
+            end
+            table.insert(tests, result)
+
+            if verbose then
+              -- Update progress bar
+              term.setCursorPos(1, select(2, term.getCursorPos()))
+              term.clearLine()
+              term.write('  * ' .. testName)
+            end
+          end,
+          -- The ut_hooks are passed to the base test instance,
+          -- but not to the local test instance in the describe block.
+          -- ut_hooks = ut_hooks,
+          test_hooks = local_test_hooks
+        }
+
+        return testFn(testName, block)
       end
-    end)
+    })
+
+    function localTest.beforeEach(hook)
+      table.insert(local_test_hooks.before, hook)
+    end
+
+    function localTest.afterEach(hook)
+      table.insert(local_test_hooks.after, hook)
+    end
+
+    runHooks(ut_hooks.before)
+    runHooks(hooks.before)
 
     block(localTest)
+
+    runHooks(hooks.after)
+    runHooks(ut_hooks.after)
 
     if verbose then
       -- Clear lines for final message
@@ -262,39 +340,84 @@ end
 ---@return UtInstance
 local function create_instance(config)
   config = config or {}
-  local verbose = config.verbose ~= false -- Default to true if not specified
+  local verbose = config.verbose ~= false
+
+  local hooks = {
+    before = {},
+    after = {}
+  }
 
   local test = {}
+  local test_hooks = {
+    before = {},
+    after = {}
+  }
+
   ---@type TestInstance
   test = setmetatable(test, {
     ---@type TestMetaCall
     __call = function(_, testName, block)
-      local testFn = createTestFunction(function(_testName, result)
-        printResult{
-          testName = _testName,
-          failed = result.failed,
-          verbose = verbose
-        }
-      end)
+      local testFn = createTestFunction{
+        onTest = function(_testName, result)
+          printResult{
+            testName = _testName,
+            failed = result.failed,
+            verbose = verbose
+          }
+        end,
+        ut_hooks = hooks,
+        test_hooks = test_hooks
+      }
 
       return testFn(testName, block)
     end
   })
 
+  function test.beforeEach(hook)
+    table.insert(test_hooks.before, hook)
+  end
+
+  function test.afterEach(hook)
+    table.insert(test_hooks.after, hook)
+  end
+
   local describe = {}
+  local describe_hooks = {
+    before = {},
+    after = {}
+  }
+
   ---@type DescribeInstance
   describe = setmetatable(describe, {
     ---@type DescribeMetaCall
     __call = function(_, description, block)
-      local describeFn = createDescribeFunction(config)
+      local describeFn = createDescribeFunction{
+        verbose = verbose,
+        ut_hooks = hooks,
+        describe_hooks = describe_hooks
+      }
       return describeFn(description, block)
     end
   })
 
+  function describe.beforeEach(hook)
+    table.insert(describe_hooks.before, hook)
+  end
+
+  function describe.afterEach(hook)
+    table.insert(describe_hooks.after, hook)
+  end
+
   ---@type UtInstance
   local instance = {
     test = test,
-    describe = describe
+    describe = describe,
+    beforeEach = function(hook)
+      table.insert(hooks.before, hook)
+    end,
+    afterEach = function(hook)
+      table.insert(hooks.after, hook)
+    end
   }
 
   return instance

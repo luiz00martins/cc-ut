@@ -424,6 +424,17 @@ local function array_filter(tab, filter)
 end
 _M.array_filter = array_filter
 
+local function array_concat(...)
+	local result = {}
+	for _, arr in ipairs({...}) do
+		for _, v in ipairs(arr) do
+			result[#result + 1] = v
+		end
+	end
+	return result
+end
+_M.array_concat = array_concat
+
 local function table_filter(tab, filter)
 	local filtered = {}
 	for k,v in pairs(tab) do
