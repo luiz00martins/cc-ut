@@ -223,7 +223,7 @@ local function createTestFunction(args)
   end
 end
 
----@param config {verbose?: boolean, ut_hooks?: InstanceHooks, describe_hooks?: InstanceHooks}
+---@param config {verbose?: boolean, ut_hooks?: InstanceHooks, describe_hooks?: InstanceHooks, onDescribe?: fun(description: string, result: DescribeResult), onTest?: fun(testName: string, result: TestResult)}
 ---@return fun(description: string, block: DescribeBlock): DescribeResult
 local function createDescribeFunction(config)
   local verbose = config.verbose ~= false
@@ -235,21 +235,17 @@ local function createDescribeFunction(config)
     before = {},
     after = {},
   }
+  local onDescribe = config.onDescribe
+  local onTest = config.onTest
 
   return function(description, block)
     if not block then
       error('No block provided')
     end
 
-    local original_color = term.getTextColor()
     local tests = {}
     local failed = {}
     local passed = {}
-
-    if verbose then
-      term.setTextColor(colors.blue)
-      print('* ' .. description)
-    end
 
     local local_test_hooks = {
       before = {},
@@ -270,16 +266,10 @@ local function createDescribeFunction(config)
             end
             table.insert(tests, result)
 
-            if verbose then
-              -- Update progress bar
-              term.setCursorPos(1, select(2, term.getCursorPos()))
-              term.clearLine()
-              term.write('  * ' .. testName)
+            if onTest then
+              onTest(_testName, result)
             end
           end,
-          -- The ut_hooks are passed to the base test instance,
-          -- but not to the local test instance in the describe block.
-          -- ut_hooks = ut_hooks,
           test_hooks = local_test_hooks
         }
 
@@ -303,36 +293,18 @@ local function createDescribeFunction(config)
     runHooks(hooks.after)
     runHooks(ut_hooks.after)
 
-    if verbose then
-      -- Clear lines for final message
-      term.setCursorPos(1, select(2, term.getCursorPos()) - 1)
-      term.clearLine()
-      term.setCursorPos(1, select(2, term.getCursorPos()) + 1)
-      term.clearLine()
-      term.setCursorPos(1, select(2, term.getCursorPos()) - 1)
-
-      -- Final message
-      if #failed == 0 then
-        term.setTextColor(colors.green)
-        print('+ ' .. description .. ' (' .. #passed .. '/' .. #tests .. ')')
-      else
-        term.clearLine()
-        term.setTextColor(colors.red)
-        print('- ' .. description .. ' (' .. #passed .. '/' .. #tests .. ')')
-        for _, test in ipairs(failed) do
-          printResult{testName = test.name, failed = test.failed, verbose = verbose}
-        end
-      end
-
-      term.setTextColor(original_color)
-    end
-
-    return {
+    local result = {
       name = description,
       status = #failed > 0 and 'failed' or 'passed',
       failed = failed,
       passed = passed,
     }
+
+    if onDescribe then
+      onDescribe(description, result)
+    end
+
+    return result
   end
 end
 
@@ -391,11 +363,52 @@ local function create_instance(config)
   describe = setmetatable(describe, {
     ---@type DescribeMetaCall
     __call = function(_, description, block)
+      local original_color = term.getTextColor()
+
       local describeFn = createDescribeFunction{
         verbose = verbose,
         ut_hooks = hooks,
-        describe_hooks = describe_hooks
+        describe_hooks = describe_hooks,
+        onTest = function(testName)
+          if verbose then
+            -- Update progress bar
+            term.setCursorPos(1, select(2, term.getCursorPos()))
+            term.clearLine()
+            term.write('  * ' .. testName)
+          end
+        end,
+        onDescribe = function(description, result)
+          if verbose then
+            -- Clear lines for final message
+            term.setCursorPos(1, select(2, term.getCursorPos()) - 1)
+            term.clearLine()
+            term.setCursorPos(1, select(2, term.getCursorPos()) + 1)
+            term.clearLine()
+            term.setCursorPos(1, select(2, term.getCursorPos()) - 1)
+
+            -- Final message
+            if #result.failed == 0 then
+              term.setTextColor(colors.green)
+              print('+ ' .. description .. ' (' .. #result.passed .. '/' .. (#result.failed + #result.passed) .. ')')
+            else
+              term.clearLine()
+              term.setTextColor(colors.red)
+              print('- ' .. description .. ' (' .. #result.passed .. '/' .. (#result.failed + #result.passed) .. ')')
+              for _, test_result in ipairs(result.failed) do
+                printResult{testName = test_result.name, failed = test_result.failed, verbose = verbose}
+              end
+            end
+
+            term.setTextColor(original_color)
+          end
+        end
       }
+
+      if verbose then
+        term.setTextColor(colors.blue)
+        print('* ' .. description)
+      end
+
       return describeFn(description, block)
     end
   })

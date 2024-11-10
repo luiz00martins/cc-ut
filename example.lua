@@ -48,7 +48,6 @@ describe("testing 'describe'", function(test)
 
 	test("test 1", function(expect)
 		expect(1).toBe(1)
-		sleep(1)
 	end)
 
 	test("test 2", function(expect)
