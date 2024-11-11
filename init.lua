@@ -175,12 +175,17 @@ end
 ---@class CreateTestFunctionArgs
 ---@field onTest? fun(testName: string, result: TestResult)
 ---@field ut_hooks? InstanceHooks
+---@field describe_hooks? InstanceHooks
 ---@field test_hooks? InstanceHooks
 ---@param args CreateTestFunctionArgs
 ---@return fun(testName: string, block: TestBlock): TestResult
 local function createTestFunction(args)
   local onTest = args.onTest
   local ut_hooks = args.ut_hooks or {
+    before = {},
+    after = {},
+  }
+  local describe_hooks = args.describe_hooks or {
     before = {},
     after = {},
   }
@@ -195,12 +200,14 @@ local function createTestFunction(args)
     end
 
     runHooks(ut_hooks.before)
+    runHooks(describe_hooks.before)
     runHooks(test_hooks.before)
 
     local expectation = createExpectation(false, nil, nil)
     local success, err = pcall(block, expectation.expect)
 
     runHooks(test_hooks.after)
+    runHooks(describe_hooks.after)
     runHooks(ut_hooks.after)
 
     local result
@@ -250,8 +257,7 @@ end
 ---@param config CreateDescribeFunctionConfig
 ---@return fun(description: string, block: DescribeBlock): DescribeResult
 local function createDescribeFunction(config)
-  local verbose = config.verbose ~= false
-  local hooks = config.describe_hooks or {
+  local describe_hooks = config.describe_hooks or {
     before = {},
     after = {},
   }
@@ -294,7 +300,9 @@ local function createDescribeFunction(config)
               onTest(_testName, result)
             end
           end,
-          test_hooks = local_test_hooks
+          ut_hooks = ut_hooks,
+          describe_hooks = describe_hooks,
+          test_hooks = local_test_hooks,
         }
 
         return testFn(testName, block)
@@ -309,13 +317,7 @@ local function createDescribeFunction(config)
       table.insert(local_test_hooks.after, hook)
     end
 
-    runHooks(ut_hooks.before)
-    runHooks(hooks.before)
-
     block(localTest)
-
-    runHooks(hooks.after)
-    runHooks(ut_hooks.after)
 
     local result = {
       name = description,
@@ -395,7 +397,7 @@ local function create_instance(config)
   config = config or {}
   local verbose = config.verbose ~= false
 
-  local hooks = {
+  local ut_hooks = {
     before = {},
     after = {}
   }
@@ -418,7 +420,7 @@ local function create_instance(config)
             verbose = verbose
           }
         end,
-        ut_hooks = hooks,
+        ut_hooks = ut_hooks,
         test_hooks = test_hooks
       }
 
@@ -448,7 +450,7 @@ local function create_instance(config)
 
       local describeFn = createDescribeFunction{
         verbose = verbose,
-        ut_hooks = hooks,
+        ut_hooks = ut_hooks,
         describe_hooks = describe_hooks,
         onTest = function(testName)
           printDescribeTestProgress{testName = testName, indent = "  ", verbose = verbose}
@@ -485,10 +487,10 @@ local function create_instance(config)
     test = test,
     describe = describe,
     beforeEach = function(hook)
-      table.insert(hooks.before, hook)
+      table.insert(ut_hooks.before, hook)
     end,
     afterEach = function(hook)
-      table.insert(hooks.after, hook)
+      table.insert(ut_hooks.after, hook)
     end
   }
 

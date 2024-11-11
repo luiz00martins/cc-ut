@@ -149,8 +149,13 @@ testResult = describe('testing hooks', function(test)
       table.insert(hookOrder, 'nested test after')
     end)
 
-    test('nested test', function(expect)
-      table.insert(hookOrder, 'nested test execution')
+    test('nested test 1', function(expect)
+      table.insert(hookOrder, 'nested test 1 execution')
+      expect(true).toBeTruthy()
+    end)
+
+    test('nested test 2', function(expect)
+      table.insert(hookOrder, 'nested test 2 execution')
       expect(true).toBeTruthy()
     end)
   end)
@@ -160,10 +165,17 @@ testResult = describe('testing hooks', function(test)
     'ut before',
     'ut describe before',
     'nested test before',
-    'nested test execution',
+    'nested test 1 execution',
     'nested test after',
     'ut describe after',
-    'ut after'
+    'ut after',
+    'ut before',
+    'ut describe before',
+    'nested test before',
+    'nested test 2 execution',
+    'nested test after',
+    'ut describe after',
+    'ut after',
   }
 
   assert_equals(textutils.serialize(hookOrder), textutils.serialize(expectedDescribeOrder))

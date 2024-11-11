@@ -6,19 +6,19 @@ local test = ut.test
 local describe = ut.describe
 
 ut.beforeEach(function()
-	-- This will be run before each test and describe.
+	-- This will be run before each test for this ut instance.
 end)
 
 ut.afterEach(function()
-	-- This will be run after each test and describe.
+	-- This will be run after each test for this ut instance.
 end)
 
 test.beforeEach(function()
-	-- This will be run before each test.
+	-- This will be run before each outer test for this ut instance.
 end)
 
 test.afterEach(function()
-	-- This will be run after each test.
+	-- This will be run after each outer test for this ut instance.
 end)
 
 test("testing 'to be'", function(expect)
@@ -30,11 +30,11 @@ test("testing 'to throw'", function(expect)
 end)
 
 describe.beforeEach(function()
-	-- This will be run before each describe.
+	-- This will be run before each test within any describe.
 end)
 
 describe.afterEach(function()
-	-- This will be run after each describe.
+	-- This will be run after each test within any describe.
 end)
 
 describe("testing 'describe'", function(test)
